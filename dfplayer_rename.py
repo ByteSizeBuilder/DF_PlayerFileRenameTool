@@ -7,6 +7,10 @@ expected by the DFPlayer Mini module:
   - Folders: 01, 02, ..., 99
   - Files:   001.mp3, 002.wav, 003.wma, ..., 255.mp3
 
+Special folders (kept as-is, files use 4-digit naming):
+  - MP3:    0001.mp3 ... up to 65535 files
+  - ADVERT: 0001.mp3 ... up to 255 files
+
 Files and folders are sorted using natural sort order (the same order shown
 in your file manager) so that the original ordering is preserved after
 renaming.  For example, "Track 2" comes before "Track 10".
@@ -26,6 +30,13 @@ RENAME_RETRIES = 5
 RENAME_RETRY_DELAY = 1  # seconds
 SUPPORTED_EXTENSIONS = {".mp3", ".wav", ".wma"}
 
+# Special folders that DFPlayer recognises by name (case-insensitive).
+# They are not numbered and use 4-digit file naming.
+SPECIAL_FOLDERS = {
+    "mp3":    {"max_files": 65535, "digits": 4},
+    "advert": {"max_files": 255,  "digits": 4},
+}
+
 # OS-created directories that should never be renamed or deleted.
 SYSTEM_DIRS = {
     "system volume information",  # Windows
@@ -38,6 +49,11 @@ SYSTEM_DIRS = {
 def _is_system_dir(name):
     """Return True if *name* is a known OS system directory."""
     return name.lower() in SYSTEM_DIRS
+
+
+def _is_special_folder(name):
+    """Return True if *name* is a DFPlayer special folder (MP3, ADVERT)."""
+    return name.lower() in SPECIAL_FOLDERS
 
 
 def _rename_with_retry(src, dst):
@@ -77,16 +93,26 @@ def natural_sort_key(text):
 def collect_folders(root):
     """Return a sorted list of subdirectory names directly under *root*.
 
-    Hidden directories and OS system directories are excluded.
+    Hidden directories, OS system directories, and special folders (MP3,
+    ADVERT) are excluded — special folders are collected separately.
     """
     entries = []
     for name in os.listdir(root):
-        if name.startswith(".") or _is_system_dir(name):
+        if name.startswith(".") or _is_system_dir(name) or _is_special_folder(name):
             continue
         if os.path.isdir(os.path.join(root, name)):
             entries.append(name)
     entries.sort(key=natural_sort_key)
     return entries
+
+
+def collect_special_folders(root):
+    """Return a list of special folder names (MP3, ADVERT) found under *root*."""
+    found = []
+    for name in os.listdir(root):
+        if os.path.isdir(os.path.join(root, name)) and _is_special_folder(name):
+            found.append(name)
+    return found
 
 
 def collect_audio_files(folder_path):
@@ -247,26 +273,61 @@ def process_sd_card(root):
         print(f"Error: '{root}' is not a valid directory.", file=sys.stderr)
         sys.exit(1)
 
-    # --- Clean non-MP3 items before renaming ---
+    # --- Clean non-audio items before renaming ---
     clean_sd_card(root)
 
+    special_folders = collect_special_folders(root)
     folders = collect_folders(root)
 
-    if not folders:
+    if not folders and not special_folders:
         print("No subdirectories found. Nothing to do.")
         return
 
     if len(folders) > MAX_FOLDERS:
         print(
-            f"Error: Found {len(folders)} folders but DFPlayer Mini supports "
-            f"at most {MAX_FOLDERS}.",
+            f"Error: Found {len(folders)} numbered folders but DFPlayer Mini "
+            f"supports at most {MAX_FOLDERS}.",
             file=sys.stderr,
         )
         sys.exit(1)
 
     total_files_renamed = 0
 
-    # --- Rename files inside each folder first (while folder names are stable) ---
+    # --- Process special folders (MP3, ADVERT) ---
+    for folder_name in special_folders:
+        folder_path = os.path.join(root, folder_name)
+        config = SPECIAL_FOLDERS[folder_name.lower()]
+        max_files = config["max_files"]
+        digits = config["digits"]
+        audio_files = collect_audio_files(folder_path)
+
+        if not audio_files:
+            print(f"  Warning: '{folder_name}/' contains no audio files – skipping.")
+            continue
+
+        if len(audio_files) > max_files:
+            print(
+                f"Error: '{folder_name}/' contains {len(audio_files)} audio files but "
+                f"DFPlayer Mini supports at most {max_files} in this folder.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        file_mapping = rename_two_phase(
+            audio_files,
+            lambda i, _f=audio_files, _d=digits: f"{i + 1:0{_d}d}{os.path.splitext(_f[i])[1].lower()}",
+            folder_path,
+        )
+
+        print(f"  [{folder_name}/]  (special folder – name kept as-is)")
+        for old, new in file_mapping:
+            if old != new:
+                print(f"    {old}  ->  {new}")
+            else:
+                print(f"    {old}  (unchanged)")
+        total_files_renamed += len(audio_files)
+
+    # --- Rename files inside each numbered folder (while folder names are stable) ---
     for folder_name in folders:
         folder_path = os.path.join(root, folder_name)
         audio_files = collect_audio_files(folder_path)
@@ -297,23 +358,28 @@ def process_sd_card(root):
                 print(f"    {old}  (unchanged)")
         total_files_renamed += len(audio_files)
 
-    # --- Now rename the folders themselves ---
-    folder_mapping = rename_two_phase(
-        folders,
-        lambda i: f"{i + 1:02d}",
-        root,
-    )
+    # --- Now rename the numbered folders themselves ---
+    if folders:
+        folder_mapping = rename_two_phase(
+            folders,
+            lambda i: f"{i + 1:02d}",
+            root,
+        )
 
-    print("\nFolder renames:")
-    for old, new in folder_mapping:
-        if old != new:
-            print(f"  {old}/  ->  {new}/")
-        else:
-            print(f"  {old}/  (unchanged)")
+        print("\nFolder renames:")
+        for old, new in folder_mapping:
+            if old != new:
+                print(f"  {old}/  ->  {new}/")
+            else:
+                print(f"  {old}/  (unchanged)")
+    else:
+        folder_mapping = []
 
     print(
         f"\nDone. Renamed {len(folder_mapping)} folder(s) and "
         f"{total_files_renamed} file(s)."
+        + (f" Special folders kept: {', '.join(special_folders)}."
+           if special_folders else "")
     )
 
 
