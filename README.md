@@ -1,6 +1,6 @@
 # DFPlayer Mini File Rename Tool
 
-A Python utility that renames folders and MP3 files on an SD card to match the
+A Python utility that renames folders and audio files on an SD card to match the
 naming convention required by the **DFPlayer Mini** MP3 player module.
 
 ## DFPlayer Mini Naming Convention
@@ -22,7 +22,7 @@ SD Card Root/
 
 - **Folders** are numbered `01` through `99` (two-digit, zero-padded).
 - **Files** within each folder are numbered `001` through `255` (three-digit,
-  zero-padded) with the `.mp3` extension.
+  zero-padded) with their original extension preserved (`.mp3`, `.wav`, `.wma`).
 
 ## Requirements
 
@@ -84,7 +84,7 @@ order.
 ## How It Works
 
 1. **Clean** – The tool scans for any files that don't belong on a DFPlayer SD
-   card: hidden files/folders (e.g. `.DS_Store`, `.Trashes`), non-MP3 files
+   card: hidden files/folders (e.g. `.DS_Store`, `.Trashes`), non-audio files
    inside folders, files in the root directory, and subdirectories nested inside
    folders. If any are found, it lists them and asks for confirmation before
    deleting.
@@ -92,8 +92,8 @@ order.
 3. **Sort** – Subdirectories are sorted using **natural sort order**
    (case-insensitive, numbers compared by value). This is the same ordering
    your file manager uses, so `Track 2` comes before `Track 10`.
-4. **Rename files** – Inside each folder, `.mp3` files are sorted in natural
-   order and renamed to `001.mp3`, `002.mp3`, etc.
+4. **Rename files** – Inside each folder, audio files are sorted in natural
+   order and renamed to `001.mp3`, `002.wav`, etc. (original extension preserved).
 5. **Rename folders** – Folders are then renamed to `01`, `02`, etc.
 
 ### Collision Avoidance
@@ -109,8 +109,8 @@ is already named `02` but needs to become `01`):
 - **99 folders max** – The DFPlayer Mini supports folders `01` through `99`.
 - **255 files per folder max** – Each folder can contain files `001` through
   `255`.
-- **MP3 only** – Only `.mp3` files are kept and renamed. All other files are
-  flagged for deletion (with user confirmation).
+- **Supported formats** – Only `.mp3`, `.wav`, and `.wma` files are kept and
+  renamed. All other files are flagged for deletion (with user confirmation).
 - **One level deep** – Only immediate subdirectories of the root are
   processed. Nested subdirectories within those folders are flagged for
   deletion.

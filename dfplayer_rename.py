@@ -2,10 +2,10 @@
 """
 DFPlayer Mini File Rename Tool
 
-Renames folders and MP3 files on an SD card to match the naming convention
+Renames folders and audio files on an SD card to match the naming convention
 expected by the DFPlayer Mini module:
   - Folders: 01, 02, ..., 99
-  - Files:   001.mp3, 002.mp3, ..., 255.mp3
+  - Files:   001.mp3, 002.wav, 003.wma, ..., 255.mp3
 
 Files and folders are sorted using natural sort order (the same order shown
 in your file manager) so that the original ordering is preserved after
@@ -24,6 +24,7 @@ MAX_FILES_PER_FOLDER = 255
 TEMP_PREFIX = "__dftemp_"
 RENAME_RETRIES = 5
 RENAME_RETRY_DELAY = 1  # seconds
+SUPPORTED_EXTENSIONS = {".mp3", ".wav", ".wma"}
 
 # OS-created directories that should never be renamed or deleted.
 SYSTEM_DIRS = {
@@ -88,24 +89,25 @@ def collect_folders(root):
     return entries
 
 
-def collect_mp3s(folder_path):
-    """Return a sorted list of .mp3 filenames inside *folder_path*."""
+def collect_audio_files(folder_path):
+    """Return a sorted list of supported audio filenames inside *folder_path*."""
     files = []
     for name in os.listdir(folder_path):
-        if os.path.isfile(os.path.join(folder_path, name)) and name.lower().endswith(".mp3"):
+        ext = os.path.splitext(name)[1].lower()
+        if os.path.isfile(os.path.join(folder_path, name)) and ext in SUPPORTED_EXTENSIONS:
             files.append(name)
     files.sort(key=natural_sort_key)
     return files
 
 
-def collect_non_mp3_items(root):
+def collect_non_audio_items(root):
     """Return a list of paths that don't belong on a DFPlayer SD card.
 
     The only items that should exist are non-hidden folders at the root level
-    and .mp3 files inside those folders.  Everything else is flagged:
+    and supported audio files inside those folders.  Everything else is flagged:
       - Any file in the root directory
       - Hidden files or folders (name starts with '.')
-      - Non-.mp3 files inside folders
+      - Non-audio files inside folders
       - Subdirectories inside folders (DFPlayer uses one level only)
     """
     items_to_delete = []
@@ -127,32 +129,33 @@ def collect_non_mp3_items(root):
             items_to_delete.append(full_path)
             continue
 
-        # Non-hidden directory — scan contents for non-mp3 items
+        # Non-hidden directory — scan contents for non-audio items
         if os.path.isdir(full_path):
             for fname in os.listdir(full_path):
                 fpath = os.path.join(full_path, fname)
+                ext = os.path.splitext(fname)[1].lower()
                 if fname.startswith("."):
                     items_to_delete.append(fpath)
                 elif os.path.isdir(fpath):
                     items_to_delete.append(fpath)
-                elif not fname.lower().endswith(".mp3"):
+                elif ext not in SUPPORTED_EXTENSIONS:
                     items_to_delete.append(fpath)
 
     return sorted(items_to_delete)
 
 
 def clean_sd_card(root):
-    """Find non-MP3 items on the SD card, prompt the user, and delete if
+    """Find non-audio items on the SD card, prompt the user, and delete if
     confirmed.  Returns True if cleaning proceeded (or nothing to clean),
     False if the user declined.
     """
-    items = collect_non_mp3_items(root)
+    items = collect_non_audio_items(root)
 
     if not items:
-        print("No non-MP3 files found. SD card is clean.\n")
+        print("No unsupported files found. SD card is clean.\n")
         return True
 
-    print(f"Found {len(items)} item(s) that are not folders or MP3 files:\n")
+    print(f"Found {len(items)} item(s) that are not folders or audio files:\n")
     for path in items:
         rel = os.path.relpath(path, root)
         if os.path.isdir(path):
@@ -237,7 +240,7 @@ def rename_two_phase(items, make_final_name, base_dir):
 
 
 def process_sd_card(root):
-    """Rename all folders and MP3 files under *root* for DFPlayer Mini."""
+    """Rename all folders and audio files under *root* for DFPlayer Mini."""
     root = os.path.abspath(root)
 
     if not os.path.isdir(root):
@@ -266,23 +269,23 @@ def process_sd_card(root):
     # --- Rename files inside each folder first (while folder names are stable) ---
     for folder_name in folders:
         folder_path = os.path.join(root, folder_name)
-        mp3s = collect_mp3s(folder_path)
+        audio_files = collect_audio_files(folder_path)
 
-        if not mp3s:
-            print(f"  Warning: '{folder_name}/' contains no .mp3 files – skipping files.")
+        if not audio_files:
+            print(f"  Warning: '{folder_name}/' contains no audio files – skipping.")
             continue
 
-        if len(mp3s) > MAX_FILES_PER_FOLDER:
+        if len(audio_files) > MAX_FILES_PER_FOLDER:
             print(
-                f"Error: '{folder_name}/' contains {len(mp3s)} .mp3 files but "
+                f"Error: '{folder_name}/' contains {len(audio_files)} audio files but "
                 f"DFPlayer Mini supports at most {MAX_FILES_PER_FOLDER}.",
                 file=sys.stderr,
             )
             sys.exit(1)
 
         file_mapping = rename_two_phase(
-            mp3s,
-            lambda i: f"{i + 1:03d}.mp3",
+            audio_files,
+            lambda i, _files=audio_files: f"{i + 1:03d}{os.path.splitext(_files[i])[1].lower()}",
             folder_path,
         )
 
@@ -292,7 +295,7 @@ def process_sd_card(root):
                 print(f"    {old}  ->  {new}")
             else:
                 print(f"    {old}  (unchanged)")
-        total_files_renamed += len(file_mapping)
+        total_files_renamed += len(audio_files)
 
     # --- Now rename the folders themselves ---
     folder_mapping = rename_two_phase(
@@ -316,7 +319,7 @@ def process_sd_card(root):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Rename folders and MP3 files for DFPlayer Mini.",
+        description="Rename folders and audio files for DFPlayer Mini.",
     )
     parser.add_argument(
         "path",
