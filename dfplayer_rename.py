@@ -5,11 +5,11 @@ DFPlayer Mini File Rename Tool
 Renames folders and audio files on an SD card to match the naming convention
 expected by the DFPlayer Mini module:
   - Folders: 01, 02, ..., 99
-  - Files:   001.mp3, 002.wav, 003.wma, ..., 255.mp3
+  - Files:   001 - Original Name.mp3, 002 - Another.wav, ..., 255 - Last.wma
 
 Special folders (kept as-is, files use 4-digit naming):
-  - MP3:    0001.mp3 ... up to 3000 files
-  - ADVERT: 0001.mp3 ... up to 3000 files
+  - MP3:    0001 - Original Name.mp3 ... up to 3000 files
+  - ADVERT: 0001 - Original Name.mp3 ... up to 3000 files
 
 Files and folders are sorted using natural sort order (the same order shown
 in your file manager) so that the original ordering is preserved after
@@ -44,6 +44,14 @@ SYSTEM_DIRS = {
     "recycler",                   # Windows (legacy)
     "lost+found",                 # Linux (ext filesystem)
 }
+
+
+def _strip_numeric_prefix(stem):
+    """Remove an existing DFPlayer numeric prefix (e.g. '001 - ') from a stem.
+
+    This prevents double-prefixing when the tool is run more than once.
+    """
+    return re.sub(r'^\d{3,4}\s*-\s*', '', stem)
 
 
 def _is_system_dir(name):
@@ -315,7 +323,11 @@ def process_sd_card(root):
 
         file_mapping = rename_two_phase(
             audio_files,
-            lambda i, _f=audio_files, _d=digits: f"{i + 1:0{_d}d}{os.path.splitext(_f[i])[1].lower()}",
+            lambda i, _f=audio_files, _d=digits: (
+                f"{i + 1:0{_d}d} - "
+                f"{_strip_numeric_prefix(os.path.splitext(_f[i])[0])}"
+                f"{os.path.splitext(_f[i])[1].lower()}"
+            ),
             folder_path,
         )
 
@@ -346,7 +358,11 @@ def process_sd_card(root):
 
         file_mapping = rename_two_phase(
             audio_files,
-            lambda i, _files=audio_files: f"{i + 1:03d}{os.path.splitext(_files[i])[1].lower()}",
+            lambda i, _files=audio_files: (
+                f"{i + 1:03d} - "
+                f"{_strip_numeric_prefix(os.path.splitext(_files[i])[0])}"
+                f"{os.path.splitext(_files[i])[1].lower()}"
+            ),
             folder_path,
         )
 

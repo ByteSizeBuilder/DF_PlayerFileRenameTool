@@ -10,37 +10,40 @@ The DFPlayer Mini expects a specific directory layout on its SD card:
 ```
 SD Card Root/
 ├── 01/
-│   ├── 001.mp3
-│   ├── 002.mp3
-│   └── 003.mp3
+│   ├── 001 - Song One.mp3
+│   ├── 002 - Song Two.mp3
+│   └── 003 - Song Three.mp3
 ├── 02/
-│   ├── 001.mp3
-│   └── 002.mp3
+│   ├── 001 - Track A.mp3
+│   └── 002 - Track B.mp3
 ├── 03/
-│   └── 001.mp3
+│   └── 001 - Intro.mp3
 ├── MP3/
-│   ├── 0001.mp3
-│   ├── 0002.mp3
-│   └── 0003.mp3
+│   ├── 0001 - Clip One.mp3
+│   ├── 0002 - Clip Two.mp3
+│   └── 0003 - Clip Three.mp3
 └── ADVERT/
-    ├── 0001.mp3
-    └── 0002.mp3
+    ├── 0001 - Ad One.mp3
+    └── 0002 - Ad Two.mp3
 ```
 
 ### Numbered folders (01–99)
 
 - **Folders** are numbered `01` through `99` (two-digit, zero-padded).
-- **Files** within each folder are numbered `001` through `255` (three-digit,
-  zero-padded) with their original extension preserved (`.mp3`, `.wav`, `.wma`).
+- **Files** within each folder are prefixed with `001` through `255` (three-digit,
+  zero-padded) followed by ` - ` and the original filename (e.g.
+  `001 - Amazing Grace.mp3`). The original extension is preserved.
 
 ### Special folders (MP3, ADVERT)
 
-- **MP3** – A special folder whose name is kept as-is. Files are numbered with
-  four digits (`0001` through `3000`). Use this folder to play tracks by number
-  without needing a numbered parent folder.
+- **MP3** – A special folder whose name is kept as-is. Files are prefixed with
+  four digits (`0001` through `3000`) followed by ` - ` and the original
+  filename (e.g. `0001 - Announcement.mp3`). Use this folder to play tracks by
+  number without needing a numbered parent folder.
 - **ADVERT** – A special folder for advertisement/interrupt tracks. Files are
-  numbered with four digits (`0001` through `3000`). Tracks in this folder can
-  be played as interrupts during normal playback.
+  prefixed with four digits (`0001` through `3000`) followed by ` - ` and the
+  original filename. Tracks in this folder can be played as interrupts during
+  normal playback.
 
 ## Requirements
 
@@ -86,21 +89,21 @@ The result:
 
 ```
 /path/to/sdcard/
-├── 01/              (was Classical/)
-│   ├── 001.mp3      (was Bach - Cello Suite.mp3)
-│   ├── 002.mp3      (was Debussy - Clair de Lune.mp3)
-│   └── 003.mp3      (was Mozart - Eine Kleine.mp3)
-├── 02/              (was Jazz/)
-│   ├── 001.mp3      (was Coltrane - Blue Train.mp3)
-│   └── 002.mp3      (was Davis - So What.mp3)
-├── 03/              (was Rock/)
-│   ├── 001.mp3      (was Led Zeppelin - Stairway.mp3)
-│   └── 002.mp3      (was Pink Floyd - Comfortably Numb.mp3)
-├── MP3/             (kept as-is)
-│   ├── 0001.mp3     (was Announcement 1.mp3)
-│   └── 0002.mp3     (was Announcement 2.mp3)
-└── ADVERT/          (kept as-is)
-    └── 0001.mp3     (was Welcome.mp3)
+├── 01/                                          (was Classical/)
+│   ├── 001 - Bach - Cello Suite.mp3             (was Bach - Cello Suite.mp3)
+│   ├── 002 - Debussy - Clair de Lune.mp3        (was Debussy - Clair de Lune.mp3)
+│   └── 003 - Mozart - Eine Kleine.mp3           (was Mozart - Eine Kleine.mp3)
+├── 02/                                          (was Jazz/)
+│   ├── 001 - Coltrane - Blue Train.mp3          (was Coltrane - Blue Train.mp3)
+│   └── 002 - Davis - So What.mp3                (was Davis - So What.mp3)
+├── 03/                                          (was Rock/)
+│   ├── 001 - Led Zeppelin - Stairway.mp3        (was Led Zeppelin - Stairway.mp3)
+│   └── 002 - Pink Floyd - Comfortably Numb.mp3  (was Pink Floyd - Comfortably Numb.mp3)
+├── MP3/                                         (kept as-is)
+│   ├── 0001 - Announcement 1.mp3                (was Announcement 1.mp3)
+│   └── 0002 - Announcement 2.mp3                (was Announcement 2.mp3)
+└── ADVERT/                                      (kept as-is)
+    └── 0001 - Welcome.mp3                       (was Welcome.mp3)
 ```
 
 Folders are assigned numbers using **natural sort order** — the same order you
@@ -122,12 +125,14 @@ order.
    (case-insensitive, numbers compared by value). This is the same ordering
    your file manager uses, so `Track 2` comes before `Track 10`.
 4. **Rename files (special folders)** – Inside `MP3` and `ADVERT` folders,
-   audio files are sorted in natural order and renamed to `0001.mp3`,
-   `0002.wav`, etc. (four-digit, original extension preserved). The folder
-   names are kept as-is.
+   audio files are sorted in natural order and renamed to
+   `0001 - Original Name.mp3`, `0002 - Original Name.wav`, etc. (four-digit
+   prefix, original filename and extension preserved). The folder names are
+   kept as-is.
 5. **Rename files (numbered folders)** – Inside each regular folder, audio
-   files are sorted in natural order and renamed to `001.mp3`, `002.wav`, etc.
-   (three-digit, original extension preserved).
+   files are sorted in natural order and renamed to
+   `001 - Original Name.mp3`, `002 - Original Name.wav`, etc. (three-digit
+   prefix, original filename and extension preserved).
 6. **Rename folders** – Regular folders are then renamed to `01`, `02`, etc.
    Special folders are not renamed.
 
@@ -144,11 +149,14 @@ is already named `02` but needs to become `01`):
 - **99 numbered folders max** – The DFPlayer Mini supports folders `01` through
   `99` (the `MP3` and `ADVERT` special folders do not count toward this limit).
 - **255 files per numbered folder** – Each numbered folder can contain files
-  `001` through `255`.
+  `001` through `255` (the DFPlayer reads only the numeric prefix).
 - **3000 files in MP3 folder** – The `MP3` special folder supports up to 3000
   files (`0001` through `3000`).
 - **3000 files in ADVERT folder** – The `ADVERT` special folder supports up to
   3000 files (`0001` through `3000`).
+- **Idempotent** – Running the tool again on an already-renamed SD card will
+  not double-prefix files (existing numeric prefixes like `001 - ` are
+  stripped before re-applying).
 - **Supported formats** – Only `.mp3`, `.wav`, and `.wma` files are kept and
   renamed. All other files are flagged for deletion (with user confirmation).
 - **One level deep** – Only immediate subdirectories of the root are
