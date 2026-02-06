@@ -36,10 +36,10 @@ SD Card Root/
 ### Special folders (MP3, ADVERT)
 
 - **MP3** – A special folder whose name is kept as-is. Files are numbered with
-  four digits (`0001` through `65535`). Use this folder to play tracks by number
+  four digits (`0001` through `3000`). Use this folder to play tracks by number
   without needing a numbered parent folder.
 - **ADVERT** – A special folder for advertisement/interrupt tracks. Files are
-  numbered with four digits (`0001` through `0255`). Tracks in this folder can
+  numbered with four digits (`0001` through `3000`). Tracks in this folder can
   be played as interrupts during normal playback.
 
 ## Requirements
@@ -145,10 +145,10 @@ is already named `02` but needs to become `01`):
   `99` (the `MP3` and `ADVERT` special folders do not count toward this limit).
 - **255 files per numbered folder** – Each numbered folder can contain files
   `001` through `255`.
-- **65535 files in MP3 folder** – The `MP3` special folder supports up to 65535
-  files (`0001` through `65535`).
-- **255 files in ADVERT folder** – The `ADVERT` special folder supports up to
-  255 files (`0001` through `0255`).
+- **3000 files in MP3 folder** – The `MP3` special folder supports up to 3000
+  files (`0001` through `3000`).
+- **3000 files in ADVERT folder** – The `ADVERT` special folder supports up to
+  3000 files (`0001` through `3000`).
 - **Supported formats** – Only `.mp3`, `.wav`, and `.wma` files are kept and
   renamed. All other files are flagged for deletion (with user confirmation).
 - **One level deep** – Only immediate subdirectories of the root are
