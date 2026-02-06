@@ -83,13 +83,18 @@ order.
 
 ## How It Works
 
-1. **Scan** – The tool scans the given root directory for subdirectories.
-2. **Sort** – Subdirectories are sorted using **natural sort order**
+1. **Clean** – The tool scans for any files that don't belong on a DFPlayer SD
+   card: hidden files/folders (e.g. `.DS_Store`, `.Trashes`), non-MP3 files
+   inside folders, files in the root directory, and subdirectories nested inside
+   folders. If any are found, it lists them and asks for confirmation before
+   deleting.
+2. **Scan** – The tool scans the given root directory for subdirectories.
+3. **Sort** – Subdirectories are sorted using **natural sort order**
    (case-insensitive, numbers compared by value). This is the same ordering
    your file manager uses, so `Track 2` comes before `Track 10`.
-3. **Rename files** – Inside each folder, `.mp3` files are sorted in natural
+4. **Rename files** – Inside each folder, `.mp3` files are sorted in natural
    order and renamed to `001.mp3`, `002.mp3`, etc.
-4. **Rename folders** – Folders are then renamed to `01`, `02`, etc.
+5. **Rename folders** – Folders are then renamed to `01`, `02`, etc.
 
 ### Collision Avoidance
 
@@ -104,7 +109,8 @@ is already named `02` but needs to become `01`):
 - **99 folders max** – The DFPlayer Mini supports folders `01` through `99`.
 - **255 files per folder max** – Each folder can contain files `001` through
   `255`.
-- **MP3 only** – Only `.mp3` files are renamed. Other files are left
-  untouched.
+- **MP3 only** – Only `.mp3` files are kept and renamed. All other files are
+  flagged for deletion (with user confirmation).
 - **One level deep** – Only immediate subdirectories of the root are
-  processed. Nested subdirectories within those folders are ignored.
+  processed. Nested subdirectories within those folders are flagged for
+  deletion.

@@ -15,11 +15,46 @@ renaming.  For example, "Track 2" comes before "Track 10".
 import argparse
 import os
 import re
+import shutil
 import sys
+import time
 
 MAX_FOLDERS = 99
 MAX_FILES_PER_FOLDER = 255
 TEMP_PREFIX = "__dftemp_"
+RENAME_RETRIES = 5
+RENAME_RETRY_DELAY = 1  # seconds
+
+# OS-created directories that should never be renamed or deleted.
+SYSTEM_DIRS = {
+    "system volume information",  # Windows
+    "$recycle.bin",               # Windows
+    "recycler",                   # Windows (legacy)
+    "lost+found",                 # Linux (ext filesystem)
+}
+
+
+def _is_system_dir(name):
+    """Return True if *name* is a known OS system directory."""
+    return name.lower() in SYSTEM_DIRS
+
+
+def _rename_with_retry(src, dst):
+    """Rename *src* to *dst*, retrying on PermissionError.
+
+    Windows background processes (Search Indexer, antivirus, shell extensions)
+    can briefly lock files and folders.  A short retry loop handles these
+    transient locks.
+    """
+    for attempt in range(RENAME_RETRIES):
+        try:
+            os.rename(src, dst)
+            return
+        except PermissionError:
+            if attempt < RENAME_RETRIES - 1:
+                time.sleep(RENAME_RETRY_DELAY)
+            else:
+                raise
 
 
 def natural_sort_key(text):
@@ -39,9 +74,14 @@ def natural_sort_key(text):
 
 
 def collect_folders(root):
-    """Return a sorted list of subdirectory names directly under *root*."""
+    """Return a sorted list of subdirectory names directly under *root*.
+
+    Hidden directories and OS system directories are excluded.
+    """
     entries = []
     for name in os.listdir(root):
+        if name.startswith(".") or _is_system_dir(name):
+            continue
         if os.path.isdir(os.path.join(root, name)):
             entries.append(name)
     entries.sort(key=natural_sort_key)
@@ -56,6 +96,98 @@ def collect_mp3s(folder_path):
             files.append(name)
     files.sort(key=natural_sort_key)
     return files
+
+
+def collect_non_mp3_items(root):
+    """Return a list of paths that don't belong on a DFPlayer SD card.
+
+    The only items that should exist are non-hidden folders at the root level
+    and .mp3 files inside those folders.  Everything else is flagged:
+      - Any file in the root directory
+      - Hidden files or folders (name starts with '.')
+      - Non-.mp3 files inside folders
+      - Subdirectories inside folders (DFPlayer uses one level only)
+    """
+    items_to_delete = []
+
+    for name in os.listdir(root):
+        full_path = os.path.join(root, name)
+
+        # OS system directories — never touch
+        if _is_system_dir(name):
+            continue
+
+        # Hidden item at root level — flag entire tree
+        if name.startswith("."):
+            items_to_delete.append(full_path)
+            continue
+
+        # File at root level — doesn't belong
+        if os.path.isfile(full_path):
+            items_to_delete.append(full_path)
+            continue
+
+        # Non-hidden directory — scan contents for non-mp3 items
+        if os.path.isdir(full_path):
+            for fname in os.listdir(full_path):
+                fpath = os.path.join(full_path, fname)
+                if fname.startswith("."):
+                    items_to_delete.append(fpath)
+                elif os.path.isdir(fpath):
+                    items_to_delete.append(fpath)
+                elif not fname.lower().endswith(".mp3"):
+                    items_to_delete.append(fpath)
+
+    return sorted(items_to_delete)
+
+
+def clean_sd_card(root):
+    """Find non-MP3 items on the SD card, prompt the user, and delete if
+    confirmed.  Returns True if cleaning proceeded (or nothing to clean),
+    False if the user declined.
+    """
+    items = collect_non_mp3_items(root)
+
+    if not items:
+        print("No non-MP3 files found. SD card is clean.\n")
+        return True
+
+    print(f"Found {len(items)} item(s) that are not folders or MP3 files:\n")
+    for path in items:
+        rel = os.path.relpath(path, root)
+        if os.path.isdir(path):
+            print(f"  [DIR]  {rel}")
+        else:
+            print(f"  [FILE] {rel}")
+
+    print()
+    answer = input("Delete these items? (yes/no): ").strip().lower()
+
+    if answer in ("y", "yes"):
+        failed = []
+        for path in items:
+            try:
+                if os.path.isdir(path):
+                    shutil.rmtree(path)
+                else:
+                    os.remove(path)
+            except PermissionError:
+                failed.append(os.path.relpath(path, root))
+
+        deleted = len(items) - len(failed)
+        if failed:
+            print(f"\nDeleted {deleted} item(s), but {len(failed)} could not "
+                  f"be removed (in use by another process):")
+            for rel in failed:
+                print(f"  {rel}")
+            print("\nTip: Close File Explorer and any other programs that may "
+                  "be accessing the SD card, then try again.\n")
+        else:
+            print(f"Deleted {deleted} item(s).\n")
+        return True
+
+    print("Skipped deletion. No files were removed.\n")
+    return False
 
 
 def rename_two_phase(items, make_final_name, base_dir):
@@ -73,23 +205,33 @@ def rename_two_phase(items, make_final_name, base_dir):
     mapping = []
     temp_names = []
 
-    # Phase 1: rename to temporary names
-    for i, old_name in enumerate(items):
-        final_name = make_final_name(i)
-        temp_name = f"{TEMP_PREFIX}{final_name}"
-        os.rename(
-            os.path.join(base_dir, old_name),
-            os.path.join(base_dir, temp_name),
-        )
-        temp_names.append(temp_name)
-        mapping.append((old_name, final_name))
+    try:
+        # Phase 1: rename to temporary names
+        for i, old_name in enumerate(items):
+            final_name = make_final_name(i)
+            temp_name = f"{TEMP_PREFIX}{final_name}"
+            _rename_with_retry(
+                os.path.join(base_dir, old_name),
+                os.path.join(base_dir, temp_name),
+            )
+            temp_names.append(temp_name)
+            mapping.append((old_name, final_name))
 
-    # Phase 2: rename temporary names to final names
-    for temp_name, (_, final_name) in zip(temp_names, mapping):
-        os.rename(
-            os.path.join(base_dir, temp_name),
-            os.path.join(base_dir, final_name),
+        # Phase 2: rename temporary names to final names
+        for temp_name, (_, final_name) in zip(temp_names, mapping):
+            _rename_with_retry(
+                os.path.join(base_dir, temp_name),
+                os.path.join(base_dir, final_name),
+            )
+    except PermissionError as exc:
+        print(
+            f"\nError: Could not rename '{exc.filename}' because it is in use "
+            f"by another process.\n"
+            f"Close File Explorer and any other programs that may be accessing "
+            f"the SD card, then try again.",
+            file=sys.stderr,
         )
+        sys.exit(1)
 
     return mapping
 
@@ -101,6 +243,9 @@ def process_sd_card(root):
     if not os.path.isdir(root):
         print(f"Error: '{root}' is not a valid directory.", file=sys.stderr)
         sys.exit(1)
+
+    # --- Clean non-MP3 items before renaming ---
+    clean_sd_card(root)
 
     folders = collect_folders(root)
 
