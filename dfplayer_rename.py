@@ -8,8 +8,8 @@ expected by the DFPlayer Mini module:
   - Files:   001.mp3, 002.wav, 003.wma, ..., 255.mp3
 
 Special folders (kept as-is, files use 4-digit naming):
-  - MP3:    0001.mp3 ... up to 65535 files
-  - ADVERT: 0001.mp3 ... up to 255 files
+  - MP3:    0001.mp3 ... up to 3000 files
+  - ADVERT: 0001.mp3 ... up to 3000 files
 
 Files and folders are sorted using natural sort order (the same order shown
 in your file manager) so that the original ordering is preserved after
@@ -33,8 +33,8 @@ SUPPORTED_EXTENSIONS = {".mp3", ".wav", ".wma"}
 # Special folders that DFPlayer recognises by name (case-insensitive).
 # They are not numbered and use 4-digit file naming.
 SPECIAL_FOLDERS = {
-    "mp3":    {"max_files": 65535, "digits": 4},
-    "advert": {"max_files": 255,  "digits": 4},
+    "mp3":    {"max_files": 3000, "digits": 4},
+    "advert": {"max_files": 3000, "digits": 4},
 }
 
 # OS-created directories that should never be renamed or deleted.
